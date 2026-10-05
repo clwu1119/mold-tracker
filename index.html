@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CE 填寫系統表單</title>
+<style>
+:root{--pri:#337ab7;--ink:#2c3e50;--line:#ddd;--bg:#f5f5f5;--ok:#28a745;--err:#dc3545}
+*{box-sizing:border-box}
+body{font-family:"Microsoft JhengHei","微軟正黑體",Arial,sans-serif;font-size:14px;line-height:1.5;color:#333;background:var(--bg);margin:0;padding:20px}
+h2{font-size:26px;margin:0 0 15px;color:var(--pri)}
+h4{font-size:18px;color:var(--ink);border-bottom:2px solid #ecf0f1;padding-bottom:8px;margin:0 0 15px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.wrap{max-width:1200px;margin:0 auto;background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.1);padding:25px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:15px 20px}
+.c3{grid-column:span 3}.c4{grid-column:span 4}.c12{grid-column:span 12}
+.fg label{font-weight:600;color:var(--ink);margin-bottom:5px;display:block}
+.req::after{content:" *";color:var(--err)}
+.fc{display:block;width:100%;height:36px;padding:6px 12px;font:inherit;color:#555;background:#fff;border:1px solid #ccc;border-radius:4px}
+textarea.fc{height:auto;resize:vertical}
+.fc:focus,.btn:focus-visible,.tab:focus-visible{outline:2px solid #66afe9;outline-offset:1px}
+.fc[readonly]{background:#f9f9f9;color:#888;cursor:not-allowed}
+.invalid{border-color:var(--err)!important;background:#fff6f6}
+.err-msg{color:var(--err);font-size:12px;margin-top:3px;display:none}.invalid+.err-msg,.box.invalid+.err-msg{display:block}
+.btn{padding:8px 16px;font:inherit;font-weight:500;cursor:pointer;border:1px solid transparent;border-radius:4px;white-space:nowrap;color:#fff}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn-pri{background:var(--pri)}.btn-ok{background:var(--ok)}.btn-danger{background:var(--err)}.btn-info{background:#5bc0de}.btn-warn{background:#f0ad4e}
+.btn-sec{background:#e2e6ea;color:#333}.btn-sm{padding:4px 10px;font-size:12px}
+.tabs{display:flex;gap:5px;border-bottom:2px solid var(--pri);margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:12px 20px;background:#f1f5f8;border:2px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;color:var(--ink);font:inherit;font-weight:500;cursor:pointer;margin-bottom:-2px}
+.tab[aria-selected=true]{background:#fff;color:var(--pri);border-color:var(--pri);font-weight:bold;border-bottom:2px solid #fff}
+.pane{display:none}.pane.on{display:block}
+.sec{background:#f8f9fa;border-radius:8px;padding:20px;margin-bottom:25px;border-left:4px solid var(--pri)}
+.tbl-wrap{overflow-x:auto}
+.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line)}
+.table th,.table td{padding:10px;border:1px solid var(--line);text-align:left;vertical-align:middle}
+.table th{background:#e9ecef}
+.tc{text-align:center!important}
+.chips{display:flex;flex-wrap:wrap;gap:8px;min-height:36px;padding:5px 0}
+.chip{display:inline-flex;align-items:center;background:#e8f4fd;color:#0056b3;border:1px solid #b8daff;border-radius:16px;padding:4px 6px 4px 12px;font-weight:bold;font-size:13px}
+.chip button{border:0;background:none;color:var(--err);cursor:pointer;font-size:16px;line-height:1;padding:0 6px}
+.box{display:flex;gap:15px;flex-wrap:wrap;padding:10px;background:#fff;border:1px solid #ccc;border-radius:4px;min-height:42px;align-items:center}
+.box label{display:flex;align-items:center;gap:5px;font-weight:normal;margin:0;cursor:pointer}
+.hint{color:#999;font-style:italic;font-size:13px}
+.file{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);padding:6px 12px;border-radius:4px;margin:5px 10px 5px 0;font-size:13px}
+.file button{border:0;background:none;color:var(--err);cursor:pointer;font-weight:bold}
+.bar{display:flex;justify-content:center;gap:15px;padding-top:20px;border-top:1px solid #e0e0e0;flex-wrap:wrap}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;background:#eef;font-size:12px}
+#toast{position:fixed;top:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:99}
+.toast{background:#333;color:#fff;padding:10px 16px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.3);max-width:360px;white-space:pre-line}
+.toast.ok{background:var(--ok)}.toast.err{background:var(--err)}
+@media(max-width:800px){.c3,.c4{grid-column:span 6}body{padding:10px}.wrap{padding:15px}}
+@media(max-width:520px){.c3,.c4{grid-column:span 12}}
+</style>
+</head>
+<body>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="wrap">
+<h2>CE 填寫系統表單</h2>
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" data-tab="query" aria-selected="true">🔍 查詢清單</button>
+  <button class="tab" role="tab" data-tab="form" aria-selected="false">📝 CE 表單填寫</button>
+</div>
+
+<!-- 查詢 -->
+<div id="pane-query" class="pane on">
+  <div class="sec" style="border-left-color:var(--ok)">
+    <h4>🔍 查詢條件</h4>
+    <div class="grid">
+      <div class="c3 fg"><label for="qMtid">修改單號</label><input id="qMtid" class="fc" placeholder="請輸入單號"></div>
+      <div class="c3 fg"><label for="qFactory">廠區</label><select id="qFactory" class="fc"><option value="">全部</option><option>越南</option><option>台灣</option></select></div>
+      <div class="c3 fg"><label for="qDate">提出日期</label><input type="date" id="qDate" class="fc"></div>
+      <div class="c3" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-pri" id="btnQuery">查詢</button>
+        <button class="btn btn-sec" id="btnClear">清除</button>
+        <button class="btn btn-info" id="btnCreate">📝 開立新單</button>
+      </div>
+    </div>
+  </div>
+  <div class="sec">
+    <h4><span>📋 查詢結果 <span class="badge" id="qCount">0</span></span><button class="btn btn-warn btn-sm" id="btnExport">匯出 CSV</button></h4>
+    <div class="tbl-wrap"><table class="table"><thead><tr><th>單號</th><th>廠區</th><th>客戶</th><th>狀態</th><th>負責人</th><th>提出日期</th><th class="tc">操作</th></tr></thead><tbody id="qBody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- 表單 -->
+<div id="pane-form" class="pane">
+  <div class="sec" style="border-left-color:#3498db">
+    <h4>🏷️ 1. 模具修改基本資料</h4>
+    <div class="grid">
+      <div class="c3 fg"><label for="txtMtid">修改單號</label><input id="txtMtid" class="fc" readonly></div>
+      <div class="c3 fg"><label class="req" for="ddlFactory">廠區</label>
+        <select id="ddlFactory" class="fc"><option value="">請選擇</option><option value="3001">越南</option><option value="1001">台灣</option></select><div class="err-msg">請選擇廠區</div></div>
+      <div class="c3 fg"><label class="req" for="txtApplyDate">提出時間</label><input type="date" id="txtApplyDate" class="fc"><div class="err-msg">請選擇提出時間</div></div>
+      <div class="c3 fg"><label class="req" for="txtFactoryNo">廠編</label><input id="txtFactoryNo" class="fc" placeholder="輸入廠編"><div class="err-msg">請輸入廠編</div></div>
+      <div class="c12 fg"><label class="req">號頭管理</label>
+        <div style="display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <input id="txtHeadNo" class="fc" placeholder="輸入號頭（例：#3、#10.5），按 Enter 新增" style="max-width:300px" aria-label="號頭">
+          <button type="button" id="btnAddHeadNo" class="btn btn-ok btn-sm">➕ 新增號頭</button>
+        </div>
+        <div id="chips" class="chips"></div>
+        <div class="hint" id="headErr" style="color:var(--err);display:none">請至少新增一個號頭</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" style="border-left-color:#f39c12">
+    <h4>📋 2. 修改明細建立</h4>
+    <div class="grid">
+      <div class="c3 fg"><label class="req" for="ddlMajorItem">修改大項</label><select id="ddlMajorItem" class="fc"><option value="">請選擇修改大項</option></select></div>
+      <div class="c3 fg"><label class="req" for="ddlMinorItem">修改細項</label><select id="ddlMinorItem" class="fc"></select></div>
+      <div class="c3 fg"><label class="req" for="txtProposer">提出者</label><input id="txtProposer" class="fc" placeholder="例：吳政龍"></div>
+      <div class="c3 fg"><label for="txtDefectRatio">不良比例 (%)</label><input type="number" min="0" max="100" step="0.1" id="txtDefectRatio" class="fc" placeholder="例：5.5"></div>
+      <div class="c12 fg"><label class="req">適用號頭（可多選）</label>
+        <div id="checks" class="box"></div>
+      </div>
+      <div class="c12 fg"><label class="req" for="txtModifyReason">修改原因</label><textarea id="txtModifyReason" rows="2" class="fc" placeholder="請輸入修改原因與具體內容..."></textarea></div>
+      <div class="c12 tc"><button type="button" id="btnAddDetail" class="btn btn-pri"><span id="lblAdd">⬇️ 加入明細至列表</span></button>
+        <button type="button" id="btnCancelEdit" class="btn btn-sec" style="display:none">取消編輯</button></div>
+      <div class="c12 tbl-wrap">
+        <table class="table"><thead><tr><th width="15%">大項 / 細項</th><th width="10%">提出者</th><th width="20%">適用號頭</th><th width="30%">修改原因</th><th width="10%" class="tc">不良率</th><th width="15%" class="tc">操作</th></tr></thead>
+        <tbody id="tbodyDetail"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" style="border-left-color:#27ae60">
+    <h4>📎 3. 附件夾檔</h4>
+    <div class="fg"><label for="fileAttachment">選擇附件（單檔限 20MB，選取後自動加入）</label>
+      <input type="file" id="fileAttachment" multiple class="fc" style="padding-top:4px;max-width:420px;height:auto">
+      <div id="files" style="margin-top:12px;min-height:40px"></div></div>
+  </div>
+
+  <div class="bar">
+    <button type="button" id="btnNew" class="btn btn-info">📝 開立新單</button>
+    <button type="button" id="btnSaveDraft" class="btn btn-sec">💾 暫存草稿</button>
+    <button type="button" id="btnSubmit" class="btn btn-ok">✅ 送出表單</button>
+  </div>
+</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayStr = () => { const d = new Date(), p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+const NEW_MTID = '[系統將於送出後自動產生]';
+const MAX_SIZE = 20 * 1024 * 1024;
+const DRAFT_KEY = 'ce_form_draft';
+
+function toast(msg, type = '') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type; t.textContent = msg;
+  $('toast').appendChild(t); setTimeout(() => t.remove(), 3500);
+}
+
+/* ---------- 資料 ---------- */
+const FACTORY = { '3001': '越南', '1001': '台灣' };
+const MAJORS = { H0001: '球頭角度', H0002: '球頭外觀', H0003: '球頭重量' };
+const MINORS = {
+  H0001: { M011: 'Loft 角度調整', M012: 'Lie 角度調整' },
+  H0002: { M021: '外觀輪廓修整', M022: 'R角放大/縮小' },
+  H0003: { M031: '總重增加', M032: '重心位置微調' }
+};
+let lastMtid = 20260922003;
+let orders = [
+  { mtid:'20260922003', factoryCode:'1001', customer:'Callaway', status:'開案', owner:'王小明', date:'2026-09-22', factoryNo:'CA-01', headNos:['#3'], details:[], files:[] },
+  { mtid:'20260922002', factoryCode:'3001', customer:'TaylorMade', status:'SENDMOLD', owner:'吳政龍', date:'2026-09-22', factoryNo:'TM-07',
+    headNos:['#3','#4'], files:[],
+    details:[{ major:'H0001', minor:'M011', proposer:'吳政龍', headNos:['#3','#4'], reason:'Loft 角度偏差，需調整', ratio:'5.5' }] }
+];
+
+/* ---------- 表單狀態 ---------- */
+let state, editIdx = -1;
+const blank = () => ({ mtid:'', headNos:[], details:[], files:[] });
+state = blank();
+
+/* ---------- Tabs ---------- */
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + name));
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+
+/* ---------- 查詢清單 ---------- */
+function renderQuery() {
+  const m = $('qMtid').value.trim(), f = $('qFactory').value, d = $('qDate').value;
+  const rows = orders.filter(o => (!m || o.mtid.includes(m)) && (!f || FACTORY[o.factoryCode] === f) && (!d || o.date === d));
+  $('qCount').textContent = rows.length;
+  $('qBody').innerHTML = rows.length ? rows.map(o => `<tr>
+    <td>${esc(o.mtid)}</td><td>${esc(FACTORY[o.factoryCode])}</td><td>${esc(o.customer)}</td><td>${esc(o.status)}</td><td>${esc(o.owner)}</td><td>${esc(o.date)}</td>
+    <td class="tc"><button class="btn btn-info btn-sm" data-edit="${esc(o.mtid)}">檢視 / 編輯</button></td></tr>`).join('')
+    : '<tr><td colspan="7" class="tc hint">沒有符合條件的資料</td></tr>';
+}
+$('btnQuery').onclick = renderQuery;
+$('btnClear').onclick = () => { ['qMtid','qFactory','qDate'].forEach(i => $(i).value = ''); renderQuery(); };
+['qMtid'].forEach(i => $(i).addEventListener('keydown', e => e.key === 'Enter' && renderQuery()));
+$('qBody').addEventListener('click', e => { const b = e.target.closest('[data-edit]'); if (b) loadOrder(b.dataset.edit); });
+$('btnExport').onclick = () => {
+  const head = ['單號','廠區','客戶','狀態','負責人','提出日期'];
+  const csv = [head, ...orders.map(o => [o.mtid, FACTORY[o.factoryCode], o.customer, o.status, o.owner, o.date])]
+    .map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' }));
+  a.download = `CE_list_${todayStr()}.csv`; a.click(); URL.revokeObjectURL(a.href);
+};
+
+/* ---------- 載入 / 清空表單 ---------- */
+function fillForm(o) {
+  state = o ? { mtid:o.mtid, headNos:[...o.headNos], details:o.details.map(d => ({...d, headNos:[...d.headNos]})), files:[...o.files] } : blank();
+  $('txtMtid').value = state.mtid || NEW_MTID;
+  $('ddlFactory').value = o ? o.factoryCode : '';
+  $('txtApplyDate').value = o ? o.date : todayStr();
+  $('txtFactoryNo').value = o ? o.factoryNo : '';
+  resetDetailInputs(); $('fileAttachment').value = '';
+  document.querySelectorAll('.invalid').forEach(x => x.classList.remove('invalid'));
+  $('headErr').style.display = 'none';
+  renderAll();
+}
+function loadOrder(mtid) {
+  const o = orders.find(x => x.mtid === mtid); if (!o) return;
+  fillForm(o); showTab('form');
+}
+function isDirty() {
+  return state.headNos.length || state.details.length || state.files.length ||
+    $('txtFactoryNo').value.trim() || $('ddlFactory').value;
+}
+function newOrder(force) {
+  if (!force && isDirty() && !confirm('目前表單有未送出的內容，確定要清空並開立新單嗎？')) return;
+  fillForm(null); showTab('form');
+}
+$('btnCreate').onclick = () => {
+  let draft = null;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) {}
+  if (draft && confirm('偵測到先前暫存的草稿，要載入嗎？\n（取消則開立空白新單）')) { applyDraft(draft); showTab('form'); }
+  else newOrder(false);
+};
+$('btnNew').onclick = () => newOrder(false);
+
+/* ---------- 大項 / 細項 ---------- */
+$('ddlMajorItem').innerHTML += Object.entries(MAJORS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+function fillMinor(major, sel) {
+  $('ddlMinorItem').innerHTML = major
+    ? '<option value="">請選擇修改細項</option>' + Object.entries(MINORS[major]).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')
+    : '<option value="">請先選擇大項</option>';
+  if (sel) $('ddlMinorItem').value = sel;
+}
+$('ddlMajorItem').addEventListener('change', e => fillMinor(e.target.value));
+fillMinor('');
+
+/* ---------- 號頭 ---------- */
+function addHeadNo() {
+  let v = $('txtHeadNo').value.trim();
+  if (!v) return toast('請輸入號頭名稱', 'err');
+  if (!v.startsWith('#')) v = '#' + v;
+  if (state.headNos.includes(v)) return toast('此號頭已存在', 'err');
+  state.headNos.push(v);
+  $('txtHeadNo').value = ''; $('headErr').style.display = 'none';
+  renderHeadNos();
+}
+$('btnAddHeadNo').onclick = addHeadNo;
+$('txtHeadNo').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addHeadNo(); } });
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]'); if (!b) return;
+  const h = b.dataset.del;
+  if (state.details.some(d => d.headNos.includes(h))) return toast(`號頭 ${h} 已被修改明細使用，請先移除相關明細`, 'err');
+  state.headNos = state.headNos.filter(x => x !== h);
+  renderHeadNos();
+});
+function renderHeadNos() {
+  const checked = [...document.querySelectorAll('input[name=chk]:checked')].map(c => c.value);
+  $('chips').innerHTML = state.headNos.length
+    ? state.headNos.map(h => `<span class="chip">${esc(h)}<button type="button" data-del="${esc(h)}" aria-label="移除 ${esc(h)}">×</button></span>`).join('')
+    : '<span class="hint">尚未新增任何號頭</span>';
+  $('checks').innerHTML = state.headNos.length
+    ? state.headNos.map(h => `<label><input type="checkbox" name="chk" value="${esc(h)}" ${checked.includes(h) ? 'checked' : ''}> ${esc(h)}</label>`).join('')
+    : '<span class="hint">請先在上方「號頭管理」建立號頭...</span>';
+}
+
+/* ---------- 修改明細（含編輯） ---------- */
+let editingDetail = -1;
+function resetDetailInputs() {
+  editingDetail = -1;
+  ['txtProposer','txtModifyReason','txtDefectRatio'].forEach(i => $(i).value = '');
+  $('ddlMajorItem').value = ''; fillMinor('');
+  document.querySelectorAll('input[name=chk]').forEach(c => c.checked = false);
+  $('lblAdd').textContent = '⬇️ 加入明細至列表'; $('btnCancelEdit').style.display = 'none';
+}
+$('btnCancelEdit').onclick = resetDetailInputs;
+$('btnAddDetail').onclick = () => {
+  const d = {
+    major: $('ddlMajorItem').value, minor: $('ddlMinorItem').value,
+    proposer: $('txtProposer').value.trim(), reason: $('txtModifyReason').value.trim(),
+    ratio: $('txtDefectRatio').value.trim(),
+    headNos: [...document.querySelectorAll('input[name=chk]:checked')].map(c => c.value)
+  };
+  if (!d.major || !d.minor) return toast('請選擇大項與細項', 'err');
+  if (!d.proposer) return toast('請輸入提出者', 'err');
+  if (!d.headNos.length) return toast('請至少勾選一個適用號頭', 'err');
+  if (!d.reason) return toast('請填寫修改原因', 'err');
+  if (d.ratio !== '' && (isNaN(d.ratio) || d.ratio < 0 || d.ratio > 100)) return toast('不良比例須介於 0 ~ 100', 'err');
+  if (editingDetail >= 0) state.details[editingDetail] = d; else state.details.push(d);
+  resetDetailInputs(); renderDetails();
+};
+$('tbodyDetail').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const i = +b.dataset.i;
+  if (b.dataset.act === 'del') { state.details.splice(i, 1); renderDetails(); return; }
+  const d = state.details[i]; editingDetail = i;
+  $('ddlMajorItem').value = d.major; fillMinor(d.major, d.minor);
+  $('txtProposer').value = d.proposer; $('txtModifyReason').value = d.reason; $('txtDefectRatio').value = d.ratio;
+  document.querySelectorAll('input[name=chk]').forEach(c => c.checked = d.headNos.includes(c.value));
+  $('lblAdd').textContent = '✔️ 更新明細'; $('btnCancelEdit').style.display = '';
+  $('ddlMajorItem').scrollIntoView({ behavior:'smooth', block:'center' });
+});
+function renderDetails() {
+  $('tbodyDetail').innerHTML = state.details.length ? state.details.map((d, i) => `<tr>
+    <td><span style="color:#888;font-size:12px">${esc(MAJORS[d.major])}</span><br><strong>${esc(MINORS[d.major][d.minor])}</strong></td>
+    <td>${esc(d.proposer)}</td><td style="color:#0056b3;font-weight:bold">${esc(d.headNos.join(', '))}</td>
+    <td>${esc(d.reason)}</td><td class="tc">${d.ratio !== '' ? esc(d.ratio) + '%' : '-'}</td>
+    <td class="tc"><button class="btn btn-info btn-sm" data-act="edit" data-i="${i}">編輯</button>
+    <button class="btn btn-danger btn-sm" data-act="del" data-i="${i}">移除</button></td></tr>`).join('')
+    : '<tr><td colspan="6" class="tc hint">尚未加入任何修改明細</td></tr>';
+}
+
+/* ---------- 附件 ---------- */
+const fmtSize = n => n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+$('fileAttachment').addEventListener('change', e => {
+  for (const f of e.target.files) {
+    if (f.size > MAX_SIZE) { toast(`「${f.name}」超過 20MB，未加入`, 'err'); continue; }
+    if (state.files.some(x => x.name === f.name)) { toast(`「${f.name}」已存在`, 'err'); continue; }
+    state.files.push({ name: f.name, size: f.size, file: f });
+  }
+  e.target.value = ''; renderFiles();
+});
+$('files').addEventListener('click', e => {
+  const b = e.target.closest('[data-i]'); if (!b) return;
+  state.files.splice(+b.dataset.i, 1); renderFiles();
+});
+function renderFiles() {
+  $('files').innerHTML = state.files.length
+    ? state.files.map((f, i) => `<span class="file">📄 ${esc(f.name)} <small>(${fmtSize(f.size)})</small><button type="button" data-i="${i}" aria-label="移除檔案">✖</button></span>`).join('')
+    : '<span class="hint">尚未加入任何檔案</span>';
+}
+function renderAll() { renderHeadNos(); renderDetails(); renderFiles(); }
+
+/* ---------- 草稿 ---------- */
+function snapshot() {
+  return { factory:$('ddlFactory').value, date:$('txtApplyDate').value, factoryNo:$('txtFactoryNo').value,
+    headNos:state.headNos, details:state.details, files:state.files.map(f => ({ name:f.name, size:f.size })) };
+}
+function applyDraft(d) {
+  fillForm(null);
+  $('ddlFactory').value = d.factory; $('txtApplyDate').value = d.date || todayStr(); $('txtFactoryNo').value = d.factoryNo;
+  state.headNos = d.headNos || []; state.details = d.details || [];
+  renderAll();
+  if (d.files && d.files.length) toast('草稿不保存附件檔案，請重新加入：\n' + d.files.map(f => f.name).join('、'));
+}
+$('btnSaveDraft').onclick = () => {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot())); toast('💾 草稿已暫存（僅存於此瀏覽器，不含附件檔案）', 'ok'); }
+  catch (e) { toast('暫存失敗，此環境不允許瀏覽器儲存', 'err'); }
+};
+
+/* ---------- 送出 ---------- */
+function validate() {
+  const bad = [];
+  [['ddlFactory'], ['txtApplyDate'], ['txtFactoryNo']].forEach(([id]) => {
+    const el = $(id), v = !el.value.trim();
+    el.classList.toggle('invalid', v); if (v) bad.push(el);
+  });
+  const noHead = !state.headNos.length;
+  $('headErr').style.display = noHead ? 'block' : 'none';
+  if (noHead) bad.push($('txtHeadNo'));
+  if (!state.details.length) { toast('至少需要一筆修改明細才能送出', 'err'); if (!bad.length) bad.push($('ddlMajorItem')); }
+  if (bad.length) { bad[0].scrollIntoView({ behavior:'smooth', block:'center' }); bad[0].focus(); }
+  return !bad.length;
+}
+['ddlFactory','txtApplyDate','txtFactoryNo'].forEach(id => $(id).addEventListener('input', e => e.target.classList.remove('invalid')));
+
+$('btnSubmit').onclick = function () {
+  if (!validate()) return;
+  if (!confirm(state.mtid ? '確定要儲存此單的修改嗎？' : '確定要送出此表單嗎？送出後將配發正式單號。')) return;
+  const btn = this, txt = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ 送出中...';
+  setTimeout(() => {   // 模擬後端：實務上請改為 AJAX / PostBack
+    const code = $('ddlFactory').value;
+    const rec = { factoryCode: code, date: $('txtApplyDate').value, factoryNo: $('txtFactoryNo').value.trim(),
+      headNos: [...state.headNos], details: state.details.map(d => ({...d})), files: state.files.map(f => ({ name:f.name, size:f.size })) };
+    const old = orders.find(o => o.mtid === state.mtid);
+    let mtid = state.mtid;
+    if (old) Object.assign(old, rec);
+    else { mtid = String(++lastMtid); orders.unshift({ ...rec, mtid, customer:'測試客戶', status:'開案', owner:'(您)' }); }
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    btn.disabled = false; btn.textContent = txt;
+    toast(`✅ ${old ? '已儲存修改' : '表單送出成功'}\n單號：${mtid}`, 'ok');
+    fillForm(null); renderQuery(); showTab('query');
+  }, 800);
+};
+
+/* ---------- 初始化 ---------- */
+fillForm(null);
+renderQuery();
+</script>
+</body>
+</html>
